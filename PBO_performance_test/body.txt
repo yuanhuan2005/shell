@@ -1,0 +1,1 @@
+{"userId":"u-000001","coverId":"1k32s0gygrkdvyn","time":10000,"channelId":1,"type":0}
