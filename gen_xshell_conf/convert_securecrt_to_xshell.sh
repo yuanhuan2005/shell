@@ -6,16 +6,14 @@ template_file="${curr_dir}/template.xsh"
 
 if [ $# -ne 2 ]
 then
-    echo "Usage: $0 HOST_FILE RESULTS_DIR"
-    echo "    HOST_FILE: host file path"
-    echo "        format 1: \"HOSTNAME###{USER}@{HOST}:{PORT}\", example: \"test_server_01###testuser@10.10.10.10:22\""
-    echo "        format 2: \"HOSTNAME###{USER}@{HOST}\", example: \"test_server_01###testuser@10.10.10.10\", default port: ${default_port}"
-    echo "    RESULTS_DIR: directory of results"
+    echo "Usage: $0 SecureCRT_Sessions_Dir Outputs_Dir"
+    echo "    SecureCRT_Sessions_Dir: directory path of SecureCRT sessions"
+    echo "    Outputs_Dir: directory of results"
     exit 1
 fi
 
-host_file=$1
-results_dir=$2
+secrt_sessions_dir="$1"
+results_dir="$2"
 if [ ! -e ${results_dir} ]
 then
     read -p "${results_dir} not found, do you want to create it: [y|n]: " if_create_results_dir
@@ -33,18 +31,25 @@ then
     fi
 fi
 
-cat ${host_file} | while read LINE
-#for LINE in `cat ${host_file}`
+ls -1 ${secrt_sessions_dir} | while read LINE
 do
-    if [ `echo $LINE | grep -c "###"` -ne 1 ]
+    if [ "`echo ${LINE%%__*}`X" == "X" ]
     then
         continue
     fi
 
-    hostname=`echo $LINE | awk -F "###" '{print $1}'`
-    user=`echo $LINE | awk -F "###" '{print $2}' | awk -F "@" '{print $1}'`
-    host=`echo $LINE | awk -F "###" '{print $2}' | awk -F "@" '{print $2}' | awk -F ":" '{print $1}'`
-    port=`echo $LINE | awk -F "###" '{print $2}' | awk -F "@" '{print $2}' | awk -F ":" '{print $2}'`
+    secrt_file=${secrt_sessions_dir}/${LINE}
+    which dos2unix > /dev/null 2>&1
+    if [ $? -eq 0 ]
+    then
+        dos2unix ${secrt_file} > /dev/null 2>&1
+    fi
+
+    hostname=`echo ${LINE%.*}`
+    user=`cat ${secrt_file} | grep "S:\"Username\"" | awk -F= '{print $2}'`
+    host=`cat ${secrt_file} | grep Hostname | awk -F= '{print $2}'`
+    port_16=`cat ${secrt_file} | grep "\[SSH2\] Port" | awk -F= '{print $2}'`
+    ((port=16#${port_16}))
     if [ ${port}X == "X" ]
     then
         port=${default_port}
@@ -64,7 +69,7 @@ do
     cp -f ${template_file} ${xsh_file} && sed -i "s/SERVER_HOSTNAME/${host}/g" ${xsh_file} && sed -i "s/USERNAME/${user}/g" ${xsh_file} && sed -i "s/PORT/${port}/g" ${xsh_file}
     if [ $? -eq 0 ]
     then
-        echo "successfully generate ${xsh_file}"
+        echo "successfully generate ${xsh_file} | ${user}@${host}:${port}"
     else
         echo "failed to generate ${xsh_file}"
     fi
